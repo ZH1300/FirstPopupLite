@@ -4,10 +4,9 @@
  * 
  * @package FirstPopupLite
  * @author I`m ZH
- * @version 1.0.0
+ * @version 1.1.0
  * @link http://imzh.cn/
  * @license GNU General Public License v3.0
- * @update: 2026.05.24
  */
 class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
 {
@@ -16,10 +15,9 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
      */
     public static function activate()
     {
-        // 仅在前台页面注入资源
         Typecho_Plugin::factory('Widget_Archive')->header = ['FirstPopupLite_Plugin', 'injectCss'];
         Typecho_Plugin::factory('Widget_Archive')->footer = ['FirstPopupLite_Plugin', 'injectHtmlAndJs'];
-        return _t('插件已激活，请前往设置公告内容。');
+        return _t('插件已激活，请前往设置公告内容及展示方式。');
     }
 
     /**
@@ -32,6 +30,7 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
      */
     public static function config(Typecho_Widget_Helper_Form $form)
     {
+        // 公告内容
         $popup_content = new Typecho_Widget_Helper_Form_Element_Textarea(
             'popup_content',
             null,
@@ -41,14 +40,25 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
         );
         $form->addInput($popup_content);
 
+        // 冷却时间
         $cooldown_hours = new Typecho_Widget_Helper_Form_Element_Text(
             'cooldown_hours',
             null,
             '24',
             '冷却时间（小时）',
-            '用户关闭后，在此时间内不再弹出。'
+            '用户关闭后，在此时间内不再弹出。<br>（当“每次弹出”开启时，本项无效）'
         );
         $form->addInput($cooldown_hours);
+
+        // 是否每次弹出
+        $always_popup = new Typecho_Widget_Helper_Form_Element_Radio(
+            'always_popup',
+            ['0' => '否（遵循冷却时间）', '1' => '是（每次刷新都弹出）'],
+            '0',
+            '每次打开网页都弹出公告',
+            '开启后，无论用户之前是否关闭过弹窗，每次页面加载都会重新弹出。'
+        );
+        $form->addInput($always_popup);
     }
 
     /**
@@ -61,7 +71,6 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
      */
     public static function injectCss()
     {
-        // 仅在前台且内容非空时输出
         if (!self::shouldInject()) {
             return;
         }
@@ -91,6 +100,7 @@ CSS;
 
         $config = self::getConfig();
         $content = $config['popup_content'];
+        $alwaysPopup = (bool)$config['always_popup'];
         $cooldownSeconds = (int)$config['cooldown_hours'] * 3600;
 
         // 输出弹窗HTML
@@ -101,41 +111,53 @@ CSS;
         echo '</div></div>';
 
         // 输出JS (IIFE 避免全局污染)
-        echo <<<JS
-<script>
-(function() {
-    var overlay = document.getElementById('fpl-overlay');
-    if (!overlay) return;
-    var closeBtn = document.getElementById('fpl-close');
-    var okBtn = document.getElementById('fpl-btn');
-    var storageKey = 'fpl_closed_time';
-    var closedTime = localStorage.getItem(storageKey);
-    var now = Date.now();
-    var cooldownMs = {$cooldownSeconds} * 1000;
-
-    // 检查是否在冷却期内
-    if (closedTime && (now - parseInt(closedTime, 10) < cooldownMs)) {
-        return;
-    }
-
-    // 延迟显示，提升体验
-    setTimeout(function() {
-        overlay.classList.add('show');
-    }, 1000);
-
-    function closePopup() {
-        overlay.classList.remove('show');
-        localStorage.setItem(storageKey, Date.now().toString());
-    }
-
-    if (closeBtn) closeBtn.onclick = closePopup;
-    if (okBtn) okBtn.onclick = closePopup;
-    overlay.onclick = function(e) {
-        if (e.target === overlay) closePopup();
-    };
-})();
-</script>
-JS;
+        echo "<script>
+        (function(){
+            var overlay = document.getElementById('fpl-overlay');
+            if (!overlay) return;
+            var closeBtn = document.getElementById('fpl-close');
+            var okBtn = document.getElementById('fpl-btn');
+            var alwaysPopup = " . json_encode($alwaysPopup) . ";
+            
+            // 每次弹出模式：直接显示，不读取任何存储，关闭时也不存储
+            if (alwaysPopup) {
+                setTimeout(function() {
+                    overlay.classList.add('show');
+                }, 1000);
+                
+                function closePopupAlways() {
+                    overlay.classList.remove('show');
+                }
+                if (closeBtn) closeBtn.onclick = closePopupAlways;
+                if (okBtn) okBtn.onclick = closePopupAlways;
+                overlay.onclick = function(e) { if (e.target === overlay) closePopupAlways(); };
+                return;
+            }
+            
+            // 普通模式：使用 localStorage 冷却机制
+            var storageKey = 'fpl_closed_time';
+            var closedTime = localStorage.getItem(storageKey);
+            var now = Date.now();
+            var cooldownMs = {$cooldownSeconds} * 1000;
+            
+            if (closedTime && (now - parseInt(closedTime, 10) < cooldownMs)) {
+                return;
+            }
+            
+            setTimeout(function() {
+                overlay.classList.add('show');
+            }, 1000);
+            
+            function closePopup() {
+                overlay.classList.remove('show');
+                localStorage.setItem(storageKey, Date.now().toString());
+            }
+            
+            if (closeBtn) closeBtn.onclick = closePopup;
+            if (okBtn) okBtn.onclick = closePopup;
+            overlay.onclick = function(e) { if (e.target === overlay) closePopup(); };
+        })();
+        </script>";
     }
 
     /**
@@ -145,11 +167,9 @@ JS;
      */
     private static function shouldInject()
     {
-        // 非前台请求不注入
         if (!defined('__TYPECHO_ROOT_DIR__') || !Typecho_Widget::widget('Widget_Archive')->have()) {
             return false;
         }
-
         $config = self::getConfig();
         return !empty($config['popup_content']);
     }
@@ -167,6 +187,7 @@ JS;
         return [
             'popup_content'   => isset($pluginConfig->popup_content) ? $pluginConfig->popup_content : '',
             'cooldown_hours'  => isset($pluginConfig->cooldown_hours) ? (int)$pluginConfig->cooldown_hours : 24,
+            'always_popup'    => isset($pluginConfig->always_popup) ? (int)$pluginConfig->always_popup : 0,
         ];
     }
 }
