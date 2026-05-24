@@ -5,7 +5,7 @@
  * @package FirstPopupLite
  * @author I'm ZH
  * @link http://imzh.cn
- * @version 1.2.0
+ * @version 1.3.0
  * @license GNU General Public License v3.0
  * @update: 2026.05.24
  */
@@ -21,7 +21,6 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
 
     public static function config(Typecho_Widget_Helper_Form $form)
     {
-        // 弹窗触发模式
         $popup_mode = new Typecho_Widget_Helper_Form_Element_Radio(
             'popup_mode',
             array(
@@ -37,9 +36,9 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
         $popup_content = new Typecho_Widget_Helper_Form_Element_Textarea(
             'popup_content', 
             NULL, 
-            '<h3 style="margin:0 0 10px;font-size:20px;">🎉 欢迎来到本站</h3><p style="margin:0;color:#555;line-height:1.6;">我们更新了全新的主题，并优化了移动端体验。<br>感谢您的支持，祝您阅读愉快！</p>', 
+            '<h3 style="margin:0 0 12px;font-size:22px;background:linear-gradient(135deg,#6366f1,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">🎉 欢迎来到本站</h3><p style="margin:0;color:#475569;line-height:1.8;font-size:15px;">我们更新了全新的主题，并优化了移动端体验。<br>感谢您的支持，祝您阅读愉快！</p>', 
             '公告内容（支持HTML）', 
-            '留空则不显示弹窗。支持标准 HTML 标签以自定义排版。'
+            '留空则不显示弹窗。支持标准 HTML 标签以自定义排版。标题推荐使用渐变文字效果。'
         );
         $popup_content->input->setAttribute('rows', 8)->setAttribute('cols', 80);
         $form->addInput($popup_content);
@@ -67,7 +66,7 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
             NULL, 
             '#6366f1', 
             '按钮主题色', 
-            'HEX颜色值，例如 #6366f1'
+            'HEX颜色值，例如 #6366f1。按钮将自动生成同色系渐变效果。'
         );
         $form->addInput($theme_color);
     }
@@ -85,19 +84,101 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
 
         echo <<<CSS
 <style id="first-popup-lite-css">
-#fpl-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,.4);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9999;display:flex;justify-content:center;align-items:center;opacity:0;visibility:hidden;transition:all .35s cubic-bezier(.4,0,.2,1)}
+/* 遮罩层：深色毛玻璃 + 淡入动画 */
+#fpl-overlay{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(15,23,42,.45);
+    backdrop-filter:blur(12px) saturate(180%);
+    -webkit-backdrop-filter:blur(12px) saturate(180%);
+    z-index:9999;display:flex;justify-content:center;align-items:center;
+    opacity:0;visibility:hidden;
+    transition:opacity .4s ease,visibility .4s ease;
+}
 #fpl-overlay.show{opacity:1;visibility:visible}
-#fpl-modal{background:#fff;width:92%;max-width:420px;border-radius:16px;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);padding:32px 28px 24px;position:relative;transform:translateY(20px) scale(.96);transition:all .35s cubic-bezier(.34,1.56,.64,1)}
+
+/* 卡片：圆润 + 柔和阴影 + 弹性缩放 */
+#fpl-modal{
+    background:rgba(255,255,255,.92);
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    width:90%;max-width:440px;
+    border-radius:24px;
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:
+        0 4px 6px -1px rgba(0,0,0,.05),
+        0 20px 40px -8px rgba(99,102,241,.18),
+        0 0 0 1px rgba(0,0,0,.03);
+    padding:36px 32px 28px;
+    position:relative;
+    transform:translateY(24px) scale(.94);
+    transition:transform .45s cubic-bezier(.34,1.56,.64,1);
+}
 #fpl-overlay.show #fpl-modal{transform:translateY(0) scale(1)}
-#fpl-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:transparent;font-size:20px;color:#94a3b8;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
-#fpl-close:hover{background:#f1f5f9;color:#334155}
-#fpl-content{font-size:15px;line-height:1.7;color:#334155;word-break:break-word}
-#fpl-content a{color:{$color};text-decoration:none;border-bottom:1px dashed {$color}}
-#fpl-content a:hover{border-bottom-style:solid}
-#fpl-btn{display:block;width:100%;margin-top:24px;padding:12px;background:{$color};color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.5px}
-#fpl-btn:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
-#fpl-btn:active{transform:translateY(0)}
-@media(max-width:480px){#fpl-modal{padding:24px 20px 20px;border-radius:12px}#fpl-content{font-size:14px}}
+
+/* 关闭按钮：圆形悬浮 + 旋转反馈 */
+#fpl-close{
+    position:absolute;top:16px;right:16px;
+    width:36px;height:36px;border-radius:50%;border:none;
+    background:rgba(0,0,0,.04);
+    font-size:18px;color:#94a3b8;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all .25s ease;
+}
+#fpl-close:hover{background:rgba(0,0,0,.08);color:#334155;transform:rotate(90deg)}
+
+/* 内容区：优雅排版 */
+#fpl-content{font-size:15px;line-height:1.8;color:#334155;word-break:break-word}
+#fpl-content h3{font-weight:700;letter-spacing:-.3px}
+#fpl-content a{
+    color:{$color};text-decoration:none;
+    border-bottom:1.5px dashed {$color};
+    transition:border-color .2s,color .2s;
+}
+#fpl-content a:hover{border-bottom-style:solid;filter:brightness(1.15)}
+#fpl-content p{margin:0}
+#fpl-content b,#fpl-content strong{color:#1e293b}
+
+/* 渐变按钮：光泽扫过动画 */
+#fpl-btn{
+    display:block;width:100%;margin-top:28px;padding:14px;
+    background:linear-gradient(135deg,{$color},color-mix(in srgb,{$color},#a855f7 40%));
+    color:#fff;border:none;border-radius:14px;
+    font-size:15px;font-weight:600;cursor:pointer;
+    letter-spacing:.5px;position:relative;overflow:hidden;
+    transition:transform .2s ease,box-shadow .2s ease;
+    box-shadow:0 4px 14px -3px color-mix(in srgb,{$color} 50%,transparent);
+}
+#fpl-btn::after{
+    content:'';position:absolute;top:0;left:-100%;
+    width:60%;height:100%;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+    transition:left .5s ease;
+}
+#fpl-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px -4px color-mix(in srgb,{$color} 60%,transparent)}
+#fpl-btn:hover::after{left:120%}
+#fpl-btn:active{transform:translateY(0) scale(.98)}
+
+/* 移动端深度适配 */
+@media(max-width:480px){
+    #fpl-modal{
+        width:92%;padding:28px 22px 22px;
+        border-radius:20px;
+        margin:0 16px;
+    }
+    #fpl-content{font-size:14px;line-height:1.75}
+    #fpl-content h3{font-size:19px !important}
+    #fpl-btn{padding:13px;border-radius:12px;font-size:14px;margin-top:22px}
+    #fpl-close{width:32px;height:32px;font-size:16px;top:12px;right:12px}
+}
+
+/* 暗色模式基础适配（跟随系统） */
+@media(prefers-color-scheme:dark){
+    #fpl-modal{background:rgba(30,41,59,.92);border-color:rgba(255,255,255,.08)}
+    #fpl-content{color:#cbd5e1}
+    #fpl-content b,#fpl-content strong{color:#f1f5f9}
+    #fpl-close{background:rgba(255,255,255,.08);color:#64748b}
+    #fpl-close:hover{background:rgba(255,255,255,.14);color:#e2e8f0}
+}
 </style>
 CSS;
     }
@@ -109,7 +190,6 @@ CSS;
 
         if (empty($config->popup_content)) return;
 
-        // 根据配置决定是否解析 HTML
         $content = ($config->allow_html == '1') 
             ? $config->popup_content 
             : nl2br(htmlspecialchars($config->popup_content));
@@ -131,17 +211,12 @@ CSS;
                 k='fpl_closed_time',
                 isAlways={$isAlways},
                 t=localStorage.getItem(k);
-            
-            // 如果不是每次弹出模式，且还在冷却期内，则直接返回
             if(!isAlways && t && new Date().getTime()-t<{$cooldownSeconds}*1000) return;
-            
             setTimeout(function(){o.classList.add('show')},800);
-            
             function close(){
                 o.classList.remove('show');
-                // 仅在非每次弹出模式下记录关闭时间
                 if(!isAlways) localStorage.setItem(k,new Date().getTime());
-                setTimeout(function(){o.style.display='none'},350);
+                setTimeout(function(){o.style.display='none'},450);
             }
             c.onclick=b.onclick=function(){close()};
             o.onclick=function(e){if(e.target===o)close()};
