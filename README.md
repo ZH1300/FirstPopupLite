@@ -6,7 +6,7 @@ _🛠️ Typecho 首次访问弹窗公告插件 🛠️_
 
 [![Typecho](https://img.shields.io/badge/Typecho-1.2%2B-blue.svg)](https://typecho.org/)
 [![License](https://img.shields.io/badge/License-GPL--3.0-green.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.0-orange.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.0-orange.svg)]()
 
 </div>
 
