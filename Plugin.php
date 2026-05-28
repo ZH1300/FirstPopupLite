@@ -1,13 +1,13 @@
 <?php
 /**
- * 首次访问弹窗公告插件 (美化增强版)
+ * 首次访问弹窗公告插件
  * 
  * @package FirstPopupLite
  * @author I'm ZH
  * @link http://imzh.cn
- * @version 1.3.0
+ * @version 1.3.2
  * @license GNU General Public License v3.0
- * @update: 2026.05.24
+ * @update: 2026.05.28
  */
 class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
 {
@@ -69,6 +69,16 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
             'HEX颜色值，例如 #6366f1。按钮将自动生成同色系渐变效果。'
         );
         $form->addInput($theme_color);
+
+        $popup_delay = new Typecho_Widget_Helper_Form_Element_Text(
+            'popup_delay',
+            NULL,
+            '800',
+            '弹窗延时（毫秒）',
+            '延迟显示弹窗的时间，单位毫秒（例如 800 = 0.8 秒）。设置为 0 则立即显示。'
+        );
+        $popup_delay->input->setAttribute('type', 'number')->setAttribute('min', '0')->setAttribute('step', '100');
+        $form->addInput($popup_delay);
     }
 
     public static function personalConfig(Typecho_Widget_Helper_Form $form) {}
@@ -84,49 +94,56 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
 
         echo <<<CSS
 <style id="first-popup-lite-css">
-/* 遮罩层：深色毛玻璃 + 淡入动画 */
+/* 遮罩层：优化渲染性能，使用半透明背景（低端设备避免重blur） */
 #fpl-overlay{
     position:fixed;top:0;left:0;width:100%;height:100%;
-    background:rgba(15,23,42,.45);
-    backdrop-filter:blur(12px) saturate(180%);
-    -webkit-backdrop-filter:blur(12px) saturate(180%);
+    background:rgba(15,23,42,0.55);
     z-index:9999;display:flex;justify-content:center;align-items:center;
     opacity:0;visibility:hidden;
-    transition:opacity .4s ease,visibility .4s ease;
+    transition:opacity 0.3s ease, visibility 0.3s ease;
+    will-change:opacity;
+}
+/* 仅在支持高性能backdrop-filter的浏览器启用毛玻璃效果，避免卡顿 */
+@supports (backdrop-filter: blur(12px)) {
+    #fpl-overlay{
+        background:rgba(15,23,42,0.45);
+        backdrop-filter:blur(12px) saturate(180%);
+        -webkit-backdrop-filter:blur(12px) saturate(180%);
+    }
 }
 #fpl-overlay.show{opacity:1;visibility:visible}
 
-/* 卡片：圆润 + 柔和阴影 + 弹性缩放 */
+/* 卡片：开启硬件加速 + 平滑缩放 */
 #fpl-modal{
-    background:rgba(255,255,255,.92);
-    backdrop-filter:blur(20px);
-    -webkit-backdrop-filter:blur(20px);
+    background:rgba(255,255,255,.96);
     width:90%;max-width:440px;
     border-radius:24px;
     border:1px solid rgba(255,255,255,.6);
     box-shadow:
-        0 4px 6px -1px rgba(0,0,0,.05),
-        0 20px 40px -8px rgba(99,102,241,.18),
-        0 0 0 1px rgba(0,0,0,.03);
+        0 20px 35px -8px rgba(0,0,0,.2),
+        0 0 0 1px rgba(0,0,0,.02);
     padding:36px 32px 28px;
     position:relative;
-    transform:translateY(24px) scale(.94);
-    transition:transform .45s cubic-bezier(.34,1.56,.64,1);
+    transform:translateY(20px) scale(0.96);
+    transition:transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+    will-change:transform;
 }
-#fpl-overlay.show #fpl-modal{transform:translateY(0) scale(1)}
+#fpl-overlay.show #fpl-modal{
+    transform:translateY(0) scale(1);
+}
 
-/* 关闭按钮：圆形悬浮 + 旋转反馈 */
+/* 关闭按钮：简化动画，减少重绘 */
 #fpl-close{
     position:absolute;top:16px;right:16px;
     width:36px;height:36px;border-radius:50%;border:none;
     background:rgba(0,0,0,.04);
     font-size:18px;color:#94a3b8;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
-    transition:all .25s ease;
+    transition:all 0.2s ease;
 }
 #fpl-close:hover{background:rgba(0,0,0,.08);color:#334155;transform:rotate(90deg)}
 
-/* 内容区：优雅排版 */
+/* 内容区排版 */
 #fpl-content{font-size:15px;line-height:1.8;color:#334155;word-break:break-word}
 #fpl-content h3{font-weight:700;letter-spacing:-.3px}
 #fpl-content a{
@@ -138,27 +155,28 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
 #fpl-content p{margin:0}
 #fpl-content b,#fpl-content strong{color:#1e293b}
 
-/* 渐变按钮：光泽扫过动画 */
+/* 按钮：仅transform动画，保持高性能 */
 #fpl-btn{
     display:block;width:100%;margin-top:28px;padding:14px;
     background:linear-gradient(135deg,{$color},color-mix(in srgb,{$color},#a855f7 40%));
     color:#fff;border:none;border-radius:14px;
     font-size:15px;font-weight:600;cursor:pointer;
     letter-spacing:.5px;position:relative;overflow:hidden;
-    transition:transform .2s ease,box-shadow .2s ease;
-    box-shadow:0 4px 14px -3px color-mix(in srgb,{$color} 50%,transparent);
+    transition:transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow:0 4px 12px -3px color-mix(in srgb,{$color} 50%,transparent);
+    will-change:transform;
 }
 #fpl-btn::after{
     content:'';position:absolute;top:0;left:-100%;
     width:60%;height:100%;
     background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
-    transition:left .5s ease;
+    transition:left 0.6s ease;
 }
 #fpl-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px -4px color-mix(in srgb,{$color} 60%,transparent)}
 #fpl-btn:hover::after{left:120%}
-#fpl-btn:active{transform:translateY(0) scale(.98)}
+#fpl-btn:active{transform:translateY(0) scale(0.98)}
 
-/* 移动端深度适配 */
+/* 移动端：移除blur、微调内边距 */
 @media(max-width:480px){
     #fpl-modal{
         width:92%;padding:28px 22px 22px;
@@ -169,11 +187,13 @@ class FirstPopupLite_Plugin implements Typecho_Plugin_Interface
     #fpl-content h3{font-size:19px !important}
     #fpl-btn{padding:13px;border-radius:12px;font-size:14px;margin-top:22px}
     #fpl-close{width:32px;height:32px;font-size:16px;top:12px;right:12px}
+    /* 移动端强制禁用backdrop-filter保证流畅 */
+    #fpl-overlay{backdrop-filter:none !important; -webkit-backdrop-filter:none !important; background:rgba(15,23,42,0.65);}
 }
 
-/* 暗色模式基础适配（跟随系统） */
+/* 暗色模式：背景半透明微调 */
 @media(prefers-color-scheme:dark){
-    #fpl-modal{background:rgba(30,41,59,.92);border-color:rgba(255,255,255,.08)}
+    #fpl-modal{background:rgba(30,41,59,.94);border-color:rgba(255,255,255,.08)}
     #fpl-content{color:#cbd5e1}
     #fpl-content b,#fpl-content strong{color:#f1f5f9}
     #fpl-close{background:rgba(255,255,255,.08);color:#64748b}
@@ -196,6 +216,7 @@ CSS;
             
         $isAlways = ($config->popup_mode === 'always') ? 'true' : 'false';
         $cooldownSeconds = (int)$config->cooldown_hours * 3600;
+        $popupDelay = max(0, (int)($config->popup_delay ?? 800));
 
         echo '<div id="fpl-overlay"><div id="fpl-modal">';
         echo '<button id="fpl-close" aria-label="关闭">&times;</button>';
@@ -203,24 +224,60 @@ CSS;
         echo '<button id="fpl-btn">我知道了</button>';
         echo '</div></div>';
 
-        echo "<script>
-        (function(){
-            var o=document.getElementById('fpl-overlay'),
-                c=document.getElementById('fpl-close'),
-                b=document.getElementById('fpl-btn'),
-                k='fpl_closed_time',
-                isAlways={$isAlways},
-                t=localStorage.getItem(k);
-            if(!isAlways && t && new Date().getTime()-t<{$cooldownSeconds}*1000) return;
-            setTimeout(function(){o.classList.add('show')},800);
-            function close(){
-                o.classList.remove('show');
-                if(!isAlways) localStorage.setItem(k,new Date().getTime());
-                setTimeout(function(){o.style.display='none'},450);
-            }
-            c.onclick=b.onclick=function(){close()};
-            o.onclick=function(e){if(e.target===o)close()};
-        })();
-        </script>";
+        echo <<<JS
+<script>
+(function(){
+    var overlay = document.getElementById('fpl-overlay');
+    var closeBtn = document.getElementById('fpl-close');
+    var confirmBtn = document.getElementById('fpl-btn');
+    var storageKey = 'fpl_closed_time';
+    var isAlways = {$isAlways};
+    var cooldownMs = {$cooldownSeconds} * 1000;
+    var delayMs = {$popupDelay};
+
+    // 检查冷却时间
+    if(!isAlways){
+        var closedTime = localStorage.getItem(storageKey);
+        if(closedTime && (new Date().getTime() - parseInt(closedTime) < cooldownMs)){
+            return;
+        }
+    }
+
+    // 平滑显示弹窗：确保DOM完全就绪，并使用 requestAnimationFrame 对齐帧渲染
+    function showModal() {
+        requestAnimationFrame(function(){
+            overlay.classList.add('show');
+        });
+    }
+
+    function closeModal() {
+        overlay.classList.remove('show');
+        if(!isAlways){
+            localStorage.setItem(storageKey, new Date().getTime().toString());
+        }
+        // 等待过渡动画结束后隐藏元素（避免遮挡点击）
+        setTimeout(function(){
+            overlay.style.display = 'none';
+        }, 350);
+    }
+
+    // 绑定关闭事件
+    closeBtn.onclick = confirmBtn.onclick = closeModal;
+    overlay.onclick = function(e) {
+        if(e.target === overlay) closeModal();
+    };
+
+    // 等待页面主要内容加载完成后再开始延迟显示，避免资源竞争导致丢帧
+    var startDelay = function() {
+        setTimeout(showModal, delayMs);
+    };
+    if(document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', startDelay);
+    } else {
+        startDelay();
+    }
+})();
+</script>
+JS;
     }
 }
