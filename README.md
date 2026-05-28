@@ -11,6 +11,8 @@ _🛠️ Typecho 首次访问弹窗公告插件 🛠️_
 </div>
 
 一个轻量级、无依赖的 Typecho 弹窗公告插件。专为“首次访问提醒”场景设计，利用浏览器本地存储实现智能防打扰机制，确保公告只在用户第一次打开网页时弹出。
+<img width="1427" height="811" alt="image" src="https://github.com/user-attachments/assets/2c8dee96-d317-4268-8e0d-bd1466f03e39" />
+
 
 ## ✨ 功能特性
 
